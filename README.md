@@ -94,3 +94,57 @@ fn main() {
 **Why this fails:** In this bad example, `novel` is destroyed at the end of the inner brackets `{ ... }`. But `i` tries to live on and be printed *after* that. The compiler looks at our `<'a>` contract, realizes the struct outlived the data, and throws an error to save us from a crash.
 
 **In simple words:** The `<'a>` syntax is just you promising the Rust compiler that the container won't outlive the borrowed data inside it.
+
+### UML Diagrams
+
+#### Class Diagram
+
+```
+               ┌──────────────────────────────┐
+               │   fn longest<'a>             │
+               │   ───────────────────────    │
+               │   x: &'a str   <<in>>        │
+               │   y: &'a str   <<in>>        │
+               │   → &'a str    <<out>>       │
+               └──────────────────────────────┘
+                    │
+                    │  ties all three refs to one
+                    │  lifetime 'a (Rule 3)
+                    ▼
+
+┌──────────────────────────────┐         ┌──────────────────────────────┐
+│          struct Point        │         │      struct Tweet            │
+│  ───────────────────────     │         │  ───────────────────────     │
+│  x: f64                      │         │  content: String             │
+│  y: f64                      │         └──────────────────────────────┘
+│  ───────────────────────     │                       │
+│  + x(&self) -> f64           │                       │ <implements>
+└──────────────────────────────┘                       ▼
+                                        ┌──────────────────────────────┐
+                                        │   trait Summarizable<'a>     │
+                                        │  ───────────────────────     │
+                                        │  + summary(&'a self)->String │
+                                        └──────────────────────────────┘
+                                                      │
+                                                      │ method must not outlive
+                                                      │ self borrow (Rule 2)
+                                                      ▼
+┌──────────────────────────────┐        ┌──────────────────────────────┐
+│   struct ImportantExcerpt<'a>│        │       fn first_ref<T>        │
+│  ───────────────────────     │        │  ───────────────────────     │
+│  part: &'a str               │        │  x: &T  →  &T                │
+└──────────────────────────────┘        │  single input lifetime       │
+          │                             │  elided onto output (Rule 1) │
+          │  holds a borrowed &str,     └──────────────────────────────┘
+          │  cannot outlive 'a
+          ▼
+          ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+          :   &'a str  (borrowed data)  :
+          ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
+   in main():  s: &'static str   <- the only reference whose lifetime
+                                   spans the entire program
+```
+
+UML mapping:
+- `<implements>` = trait relation, `Point`/`ImportantExcerpt`/`Tweet` = classes, `longest`/`first_ref` = free functions, `&'a str` = borrowed association, `'static` = special-case lifetime.
